@@ -1,44 +1,76 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DHT11 Data Display</title>
-  <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-database.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-storage.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-messaging.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.7/firebase-functions.js"></script>
-  
-  <script>
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.7/firebase-app.js';
+    import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/9.6.7/firebase-database.js';
+
     // Firebase configuration
     const firebaseConfig = {
-        apiKey: "AIzaSyAnIawyi5ebANde0iC2QvDQPyOe80960So",
-        authDomain: "room-e6d4f.firebaseapp.com",
-        databaseURL: "https://room-e6d4f-default-rtdb.firebaseio.com",
-        projectId: "room-e6d4f",
-        storageBucket: "room-e6d4f.appspot.com",
-        messagingSenderId: "188728639267",
-        appId: "1:188728639267:web:8d2170f88f381eabf29696"
+      apiKey: "AIzaSyAnIawyi5ebANde0iC2QvDQPyOe80960So",
+      authDomain: "room-e6d4f.firebaseapp.com",
+      databaseURL: "https://room-e6d4f-default-rtdb.firebaseio.com",
+      projectId: "room-e6d4f",
+      storageBucket: "room-e6d4f.appspot.com",
+      messagingSenderId: "188728639267",
+      appId: "1:188728639267:web:8d2170f88f381eabf29696"
     };
 
     // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
+    const firebaseApp = initializeApp(firebaseConfig);
 
-    // Reference to the DHT11 data in Firebase
-    const databaseRef = firebase.database().ref('DHT11');
+    function initializePushNotifications(registration, temperature, humidity) {
+      // Check temperature and humidity thresholds and send notifications
+      const maxTemp = 30; // Set your maximum temperature threshold
+      const minTemp = 10; // Set your minimum temperature threshold
+      const maxHumidity = 80; // Set your maximum humidity threshold
+      const minHumidity = 40; // Set your minimum humidity threshold
 
-    // Retrieve the temperature and humidity values from Firebase
-    databaseRef.on('value', (snapshot) => {
-      const data = snapshot.val();
-      const temperature = data.temperature;
-      const humidity = data.humidity;
+      if (temperature > maxTemp || temperature < minTemp || humidity > maxHumidity || humidity < minHumidity) {
+        // Request permission and send a notification
+        Notification.requestPermission().then(function (permission) {
+          if (permission === 'granted') {
+            const notificationOptions = {
+              body: `Temperature: ${temperature}°C, Humidity: ${humidity}%`,
+              icon: 'icon.png',
+              sound: 'notification.mp3' // Add a sound file
+            };
 
-      // Update the UI components to display the data
-      document.getElementById('temperature').innerHTML = temperature + '&deg;C';
-      document.getElementById('humidity').innerHTML = humidity + '%';
-    });
+            registration.showNotification('DHT11 Alert', notificationOptions);
+          }
+        });
+      }
+    }
+
+    // Register the service worker
+    navigator.serviceWorker.register('service-worker.js')
+      .then(function(registration) {
+        console.log('Service Worker registered with scope:', registration.scope);
+
+        // Reference to the DHT11 data in Firebase
+        const databaseRef = ref(getDatabase(firebaseApp), 'DHT11/');
+
+        // Retrieve the temperature and humidity values from Firebase
+        onValue(databaseRef, (snapshot) => {
+          const data = snapshot.val();
+          const temperature = data.Temperature;
+          const humidity = data.Humidity;
+
+          // Update the UI components to display the data
+          document.getElementById('temperature').innerHTML = temperature + '&deg;C';
+          document.getElementById('humidity').innerHTML = humidity + '%';
+
+          // Call the function to check thresholds and send notifications
+          initializePushNotifications(registration, temperature, humidity);
+        });
+      })
+      .catch(function(error) {
+        console.error('Service Worker registration failed:', error);
+      });
   </script>
 </head>
 <body>
